@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/config'; // Pastikan file ini ada
+import { auth, db } from '../firebase/config'; 
 import * as authSvc from '../firebase/authService';
 
 const AuthContext = createContext(null);
@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Listener status login
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
@@ -35,6 +36,7 @@ export const AuthProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
+  // Bungkus fungsi dari authService agar bisa dipakai di UI
   const register = (username, email, password) => authSvc.registerUser(username, email, password);
   const login = (email, password) => authSvc.loginUser(email, password);
   const logout = () => authSvc.logoutUser();
