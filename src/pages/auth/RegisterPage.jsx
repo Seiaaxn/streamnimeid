@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, Check } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contex/AuthContext';
 
 const RegisterPage = () => {
     const navigate = useNavigate();
@@ -37,13 +37,24 @@ const RegisterPage = () => {
             setError('Konfirmasi password tidak cocok');
             return;
         }
+        if (form.password.length < 6) {
+            setError('Password minimal 6 karakter');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
-            register(form.username, form.email, form.password);
+            await register(form.username, form.email, form.password);
             navigate('/');
         } catch (err) {
-            setError(err.message);
+            const msg = err.code === 'auth/email-already-in-use'
+                ? 'Email sudah terdaftar'
+                : err.code === 'auth/weak-password'
+                ? 'Password terlalu lemah'
+                : err.code === 'auth/invalid-email'
+                ? 'Format email tidak valid'
+                : err.message || 'Terjadi kesalahan';
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -58,7 +69,6 @@ const RegisterPage = () => {
             </div>
 
             <div className="flex-1 flex flex-col justify-center px-6 pb-8">
-                {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="w-14 h-14 rounded-2xl bg-primary-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-400/30">
                         <Play size={24} className="text-black ml-1" fill="currentColor" />
@@ -174,4 +184,4 @@ const RegisterPage = () => {
 };
 
 export default RegisterPage;
-                     
+        
