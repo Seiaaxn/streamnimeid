@@ -288,7 +288,7 @@ const StreamingAnime = () => {
                     allEpisodesUrl={`/anime/detail?url=${encodeURIComponent(anime?.url)}`}
                 /> */}
 
-                <StreamingAnimeCommentsSection/>
+                <StreamingAnimeCommentsSection contentId={episodeUrl || 'unknown'} />
             </div>
         </div>
     );
