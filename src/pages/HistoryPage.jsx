@@ -1,419 +1,191 @@
-// pages/HistoryPage.jsx
+// HistoryPage.jsx - Firebase-powered watch history
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-    ArrowLeft, Play, Trash2, Clock, Film, Calendar,
-    ChevronRight, AlertCircle, X, Eye
-} from 'lucide-react';
-import { getHistory, removeFromHistory, clearHistory } from '../utils/history';
+import { useNavigate, Link } from 'react-router-dom';
+import { Play, Trash2, Clock, X, RefreshCw, LogIn } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getFirebaseHistory, removeFromFirebaseHistory, clearFirebaseHistory } from '../firebase/historyService';
 
-const HistoryPage = ({ onAnimeSelect }) => {
-    const navigate = useNavigate();
-    const [history, setHistory] = useState([]);
-    const [selectedItems, setSelectedItems] = useState([]);
-    const [selectMode, setSelectMode] = useState(false);
+const HistoryPage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
 
-    // Load history
-    useEffect(() => {
-        setHistory(getHistory());
-    }, []);
+  useEffect(() => {
+    if (user) loadHistory();
+    else setLoading(false);
+  }, [user]);
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+  const loadHistory = async () => {
+    setLoading(true);
+    const data = await getFirebaseHistory(user.uid);
+    setHistory(data);
+    setLoading(false);
+  };
 
-    const handleRemove = (url) => {
-        const newHistory = removeFromHistory(url);
-        setHistory(newHistory);
-        setSelectedItems(prev => prev.filter(item => item !== url));
-    };
+  const handleRemove = async (docId) => {
+    await removeFromFirebaseHistory(user.uid, docId);
+    setHistory(prev => prev.filter(h => h.id !== docId));
+  };
 
-    const handleClearAll = () => {
-        if (window.confirm('Are you sure you want to clear all watch history?')) {
-            clearHistory();
-            setHistory([]);
-            setSelectMode(false);
-        }
-    };
+  const handleClearAll = async () => {
+    if (!window.confirm('Hapus semua riwayat tontonan?')) return;
+    setClearing(true);
+    await clearFirebaseHistory(user.uid);
+    setHistory([]);
+    setClearing(false);
+  };
 
-    const toggleSelect = (url) => {
-        setSelectedItems(prev => {
-            if (prev.includes(url)) {
-                return prev.filter(item => item !== url);
-            } else {
-                return [...prev, url];
-            }
-        });
-    };
+  const handleContinue = (item) => {
+    const path = item.category === 'donghua' ? '/donghua/watch' : '/anime/watch';
+    navigate(`${path}?url=${encodeURIComponent(item.episodeUrl || item.url)}`);
+  };
 
-    const handleBulkRemove = () => {
-        if (selectedItems.length === 0) return;
+  const timeAgo = (ts) => {
+    if (!ts) return '';
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60) return 'Baru saja';
+    if (diff < 3600) return `${Math.floor(diff/60)} menit lalu`;
+    if (diff < 86400) return `${Math.floor(diff/3600)} jam lalu`;
+    if (diff < 604800) return `${Math.floor(diff/86400)} hari lalu`;
+    return date.toLocaleDateString('id-ID');
+  };
 
-        if (window.confirm(`Remove ${selectedItems.length} item(s) from history?`)) {
-            let newHistory = [...history];
-            selectedItems.forEach(url => {
-                newHistory = removeFromHistory(url);
-            });
-            setHistory(newHistory);
-            setSelectedItems([]);
-            setSelectMode(false);
-        }
-    };
-
-    const handleItemClick = (item) => {
-        // Langsung ke watch page
-        navigate(`/${item.source === 'samehadaku' ? 'anime' : 'donghua'}/watch`, {
-            state: {
-                anime: {
-                    title: item.title,
-                    url: item.url,
-                    image: item.image,
-                    source: item.source,
-                    category: item.category
-                },
-                episode: {
-                    title: item.episodeTitle,
-                    url: item.episodeUrl,
-                    episode: item.episode
-                },
-                episodes: [] // Fetch nanti di StreamingPage
-            }
-        });
-    };
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInSeconds = Math.floor((now - date) / 1000);
-
-        if (diffInSeconds < 60) return 'Just now';
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-        if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-        });
-    };
-
-    // Group history by date (today, yesterday, this week, older)
-    const groupHistory = () => {
-        const groups = {
-            today: [],
-            yesterday: [],
-            thisWeek: [],
-            older: []
-        };
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-
-        history.forEach(item => {
-            const itemDate = new Date(item.lastWatched);
-            itemDate.setHours(0, 0, 0, 0);
-
-            if (itemDate.getTime() === today.getTime()) {
-                groups.today.push(item);
-            } else if (itemDate.getTime() === yesterday.getTime()) {
-                groups.yesterday.push(item);
-            } else if (itemDate > weekAgo) {
-                groups.thisWeek.push(item);
-            } else {
-                groups.older.push(item);
-            }
-        });
-
-        return groups;
-    };
-
-    const groups = groupHistory();
-
+  // Not logged in
+  if (!user && !loading) {
     return (
-        <div className="min-h-screen bg-dark-bg">
-            {/* Header */}
-            <div className="sticky top-0 z-30 bg-dark-bg/95 backdrop-blur-sm border-b border-dark-border">
-                <div className="p-4">
-                    <div className="flex items-center gap-3">
-                        {/* <button
-                            onClick={handleBack}
-                            className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors"
-                        >
-                            <ArrowLeft size={24} />
-                        </button> */}
-
-                        <div className="flex-1">
-                            <h2 className="text-lg font-bold text-white">Watch History</h2>
-                            {/* <p className="text-xs text-gray-500">
-                                {history.length} {history.length === 1 ? 'item' : 'items'}
-                            </p> */}
-                        </div>
-
-                        {history.length > 0 && (
-                            <button
-                                onClick={() => setSelectMode(!selectMode)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${selectMode
-                                        ? 'bg-primary-400 text-black'
-                                        : 'bg-dark-surface text-gray-400 border border-dark-border hover:text-white'
-                                    }`}
-                            >
-                                {selectMode ? 'Cancel' : 'Select'}
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Selection Mode Bar */}
-                    {selectMode && (
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-dark-border">
-                            <button
-                                onClick={() => {
-                                    if (selectedItems.length === history.length) {
-                                        setSelectedItems([]);
-                                    } else {
-                                        setSelectedItems(history.map(item => item.url));
-                                    }
-                                }}
-                                className="text-xs text-gray-400 hover:text-primary-400 transition-colors"
-                            >
-                                {selectedItems.length === history.length ? 'Deselect All' : 'Select All'}
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400">
-                                    {selectedItems.length} selected
-                                </span>
-                                {selectedItems.length > 0 && (
-                                    <button
-                                        onClick={handleBulkRemove}
-                                        className="flex items-center gap-1 px-3 py-1 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors"
-                                    >
-                                        <Trash2 size={12} />
-                                        <span>Remove</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-4">
-                {history.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="w-16 h-16 bg-dark-surface rounded-full flex items-center justify-center mb-4">
-                            <Eye size={32} className="text-gray-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-white mb-2">No watch history</h3>
-                        <p className="text-sm text-gray-500 mb-6 max-w-xs">
-                            Start watching anime and they'll appear here for easy access
-                        </p>
-                        <button
-                            onClick={handleBack}
-                            className="px-4 py-2 bg-primary-400 text-black rounded-lg text-sm font-medium hover:bg-primary-300 transition-colors"
-                        >
-                            Browse Anime
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        {/* Today */}
-                        {groups.today.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-400 mb-3 px-1">TODAY</h3>
-                                <HistoryList
-                                    items={groups.today}
-                                    selectMode={selectMode}
-                                    selectedItems={selectedItems}
-                                    onToggleSelect={toggleSelect}
-                                    onItemClick={handleItemClick}
-                                    onRemove={handleRemove}
-                                    formatDate={formatDate}
-                                />
-                            </div>
-                        )}
-
-                        {/* Yesterday */}
-                        {groups.yesterday.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-400 mb-3 px-1">YESTERDAY</h3>
-                                <HistoryList
-                                    items={groups.yesterday}
-                                    selectMode={selectMode}
-                                    selectedItems={selectedItems}
-                                    onToggleSelect={toggleSelect}
-                                    onItemClick={handleItemClick}
-                                    onRemove={handleRemove}
-                                    formatDate={formatDate}
-                                />
-                            </div>
-                        )}
-
-                        {/* This Week */}
-                        {groups.thisWeek.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-400 mb-3 px-1">THIS WEEK</h3>
-                                <HistoryList
-                                    items={groups.thisWeek}
-                                    selectMode={selectMode}
-                                    selectedItems={selectedItems}
-                                    onToggleSelect={toggleSelect}
-                                    onItemClick={handleItemClick}
-                                    onRemove={handleRemove}
-                                    formatDate={formatDate}
-                                />
-                            </div>
-                        )}
-
-                        {/* Older */}
-                        {groups.older.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-400 mb-3 px-1">OLDER</h3>
-                                <HistoryList
-                                    items={groups.older}
-                                    selectMode={selectMode}
-                                    selectedItems={selectedItems}
-                                    onToggleSelect={toggleSelect}
-                                    onItemClick={handleItemClick}
-                                    onRemove={handleRemove}
-                                    formatDate={formatDate}
-                                />
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+      <div className="min-h-screen bg-dark-bg pb-20">
+        <header className="sticky top-0 z-40 border-b border-dark-border" style={{background:'rgba(10,10,10,0.95)',backdropFilter:'blur(20px)'}}>
+          <div className="px-4 h-14 flex items-center">
+            <Clock size={18} className="text-primary-400 mr-2" />
+            <h1 className="text-base font-bold text-white">Riwayat</h1>
+          </div>
+        </header>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-dark-card flex items-center justify-center mb-4">
+            <Clock size={28} className="text-gray-600" />
+          </div>
+          <h2 className="text-base font-bold text-white mb-2">Belum Login</h2>
+          <p className="text-gray-500 text-sm mb-6">Login untuk menyimpan riwayat tontonanmu</p>
+          <Link to="/login" className="px-6 py-3 bg-primary-400 text-black font-bold rounded-xl text-sm">
+            Login Sekarang
+          </Link>
         </div>
+      </div>
     );
-};
+  }
 
-// Component untuk daftar history
-const HistoryList = ({ items, selectMode, selectedItems, onToggleSelect, onItemClick, onRemove, formatDate }) => {
-    return (
-        <div className="space-y-2">
-            {items.map((item) => (
-                <div
-                    key={item.id}
-                    className={`group relative bg-dark-surface rounded-xl overflow-hidden border transition-all ${selectMode
-                            ? selectedItems.includes(item.url)
-                                ? 'border-primary-400'
-                                : 'border-dark-border'
-                            : 'border-dark-border hover:border-primary-400/50'
-                        }`}
-                >
-                    {selectMode ? (
-                        // Selection Mode
-                        <div className="flex items-center p-3">
-                            <button
-                                onClick={() => onToggleSelect(item.url)}
-                                className={`w-6 h-6 rounded-lg border-2 mr-3 flex items-center justify-center transition-colors ${selectedItems.includes(item.url)
-                                        ? 'bg-primary-400 border-primary-400'
-                                        : 'border-gray-600'
-                                    }`}
-                            >
-                                {selectedItems.includes(item.url) && (
-                                    <X size={14} className="text-black" />
-                                )}
-                            </button>
+  return (
+    <div className="min-h-screen bg-dark-bg pb-20">
+      <header className="sticky top-0 z-40 border-b border-dark-border" style={{background:'rgba(10,10,10,0.95)',backdropFilter:'blur(20px)'}}>
+        <div className="px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock size={17} className="text-primary-400" />
+            <h1 className="text-base font-bold text-white">Riwayat Tontonan</h1>
+          </div>
+          {history.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={clearing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-medium disabled:opacity-60"
+            >
+              {clearing ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Hapus Semua
+            </button>
+          )}
+        </div>
+      </header>
 
-                            <div
-                                className="flex-1 flex items-center gap-3 cursor-pointer"
-                                onClick={() => onItemClick(item)}
-                            >
-                                <img
-                                    src={item.image || 'https://via.placeholder.com/60x80/1a1a1a/666666?text=No+Image'}
-                                    alt={item.title}
-                                    className="w-16 h-20 object-cover rounded-lg"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="text-sm font-medium text-white mb-1 line-clamp-1">
-                                        {item.title}
-                                    </h4>
-                                    <p className="text-xs text-primary-400 mb-1">
-                                        {item.episodeTitle}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500">
-                                        {formatDate(item.lastWatched)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        // Normal Mode
-                        <div
-                            onClick={() => onItemClick(item)}
-                            className="flex items-center gap-3 p-3 cursor-pointer"
-                        >
-                            <img
-                                src={item.image || 'https://via.placeholder.com/60x80/1a1a1a/666666?text=No+Image'}
-                                alt={item.title}
-                                className="w-16 h-20 object-cover rounded-lg"
-                            />
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                    <h4 className="text-sm font-medium text-white group-hover:text-primary-300 transition-colors line-clamp-1">
-                                        {item.title}
-                                    </h4>
-                                    <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded shrink-0 ${item.source === 'samehadaku' ? 'bg-blue-500/90' : 'bg-red-500/90'
-                                        } text-white`}>
-                                        {item.source === 'samehadaku' ? 'ANIME' : 'DONGHUA'}
-                                    </span>
-                                </div>
-
-                                <p className="text-xs text-primary-400 mt-1 font-medium">
-                                    {item.episodeTitle}
-                                </p>
-
-                                <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                                        <Calendar size={10} />
-                                        <span>{formatDate(item.lastWatched)}</span>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        {/* Progress Bar */}
-                                        <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary-400"
-                                                style={{ width: `${item.progress}%` }}
-                                            />
-                                        </div>
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onRemove(item.url);
-                                            }}
-                                            className="p-1 hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Trash2 size={12} className="text-gray-400" />
-                                        </button>
-
-                                        <ChevronRight size={14} className="text-gray-500" />
-                                    </div>
-                                </div>
-
-                                {/* Total episodes info */}
-                                {item.totalEpisodes > 0 && (
-                                    <p className="text-[8px] text-gray-600 mt-1">
-                                        {item.totalEpisodes} episodes total
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+      <div className="px-4 pt-4">
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex gap-3 p-3 bg-dark-card rounded-2xl border border-dark-border animate-pulse">
+                <div className="w-16 h-20 rounded-xl bg-dark-surface flex-shrink-0" />
+                <div className="flex-1 space-y-2 py-1">
+                  <div className="h-4 w-3/4 bg-dark-surface rounded" />
+                  <div className="h-3 w-1/2 bg-dark-surface rounded" />
+                  <div className="h-3 w-1/3 bg-dark-surface rounded" />
                 </div>
+              </div>
             ))}
-        </div>
-    );
+          </div>
+        ) : history.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+            <div className="w-16 h-16 rounded-full bg-dark-card flex items-center justify-center mb-4">
+              <Clock size={28} className="text-gray-700" />
+            </div>
+            <h2 className="text-base font-bold text-white mb-2">Belum Ada Riwayat</h2>
+            <p className="text-gray-500 text-sm mb-6">Anime yang kamu tonton akan muncul di sini</p>
+            <button onClick={() => navigate('/')} className="px-6 py-3 bg-primary-400 text-black font-bold rounded-xl text-sm">
+              Jelajahi Anime
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-600 mb-2">{history.length} episode ditonton</p>
+            {history.map(item => (
+              <div
+                key={item.id}
+                className="flex gap-3 p-3 bg-dark-card border border-dark-border rounded-2xl group hover:border-primary-400/30 transition-colors"
+              >
+                {/* Thumbnail */}
+                <div
+                  className="w-16 h-20 rounded-xl overflow-hidden bg-dark-surface flex-shrink-0 cursor-pointer"
+                  onClick={() => handleContinue(item)}
+                >
+                  <img
+                    src={item.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.title?.slice(0,5))}&background=1a1a1a&color=fff`}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                    onError={e => { e.target.src = `https://ui-avatars.com/api/?name=A&background=1a1a1a&color=fff`; }}
+                  />
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h3
+                    className="text-sm font-semibold text-white line-clamp-1 cursor-pointer hover:text-primary-300 transition-colors"
+                    onClick={() => handleContinue(item)}
+                  >
+                    {item.title}
+                  </h3>
+                  <p className="text-xs text-primary-400 mt-0.5">
+                    {item.episodeTitle || `Episode ${item.episode || '?'}`}
+                  </p>
+                  <p className="text-[10px] text-gray-600 mt-1">{timeAgo(item.watchedAt)}</p>
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => handleContinue(item)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-400/15 text-primary-400 rounded-lg text-[11px] font-semibold hover:bg-primary-400/25 transition-colors"
+                    >
+                      <Play size={11} fill="currentColor" />
+                      Lanjutkan
+                    </button>
+                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${item.category === 'donghua' ? 'bg-red-500/15 text-red-400' : 'bg-blue-500/15 text-blue-400'}`}>
+                      {item.category === 'donghua' ? 'Donghua' : 'Anime'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Remove */}
+                <button
+                  onClick={() => handleRemove(item.id)}
+                  className="p-1.5 text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 self-start"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default HistoryPage;
+                
