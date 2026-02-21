@@ -1,7 +1,9 @@
-// stub - tidak pakai Firebase
-export const registerUser = () => { throw new Error('Gunakan AuthContext'); };
-export const loginUser = () => { throw new Error('Gunakan AuthContext'); };
-export const logoutUser = () => { throw new Error('Gunakan AuthContext'); };
-export const uploadAvatar = () => { throw new Error('Gunakan AuthContext'); };
-export const updateUserProfile = () => { throw new Error('Gunakan AuthContext'); };
-export const changeUserPassword = () => { throw new Error('Gunakan AuthContext'); };
+// Stub - auth ditangani langsung di AuthContext dengan localStorage
+export const registerUser = async () => {};
+export const loginUser = async () => {};
+export const logoutUser = async () => {};
+export const getUserProfile = async () => null;
+export const updateUserProfile = async () => {};
+export const uploadAvatar = async () => null;
+export const changeUserPassword = async () => {};
+export const onAuthChange = () => () => {};
