@@ -41,7 +41,7 @@ const LatestDonghuaSection = ({ items = [], loading = false, onItemClick }) => {
                     <h2 className="text-sm font-semibold text-white tracking-wide">Latest Donghua</h2>
                 </div>
                 <button
-                    onClick={() => navigate('/explore')}
+                    onClick={() => navigate('/explore/all-donghua')}
                     className="flex items-center gap-0.5 text-[11px] text-red-400 hover:text-red-300 transition-colors"
                 >
                     <span>See All</span>
