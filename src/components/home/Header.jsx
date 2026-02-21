@@ -16,8 +16,8 @@ const Header = ({ scrolled }) => {
                         <span className="text-black font-black text-xs">▶</span>
                     </div>
                     <span className="text-base font-bold tracking-tight">
-                        <span className="text-white">anime</span>
-                        <span className="text-primary-400">play</span>
+                        <span className="text-white">streamn</span>
+                        <span className="text-primary-400">imeid</span>
                     </span>
                 </div>
 
