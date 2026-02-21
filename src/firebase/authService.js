@@ -1,19 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-
-const firebaseConfig = {
-  // Masukkan config dari Firebase Console kamu di sini
-  apiKey: "...",
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
-};
-
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// stub - tidak pakai Firebase
+export const registerUser = () => { throw new Error('Gunakan AuthContext'); };
+export const loginUser = () => { throw new Error('Gunakan AuthContext'); };
+export const logoutUser = () => { throw new Error('Gunakan AuthContext'); };
+export const uploadAvatar = () => { throw new Error('Gunakan AuthContext'); };
+export const updateUserProfile = () => { throw new Error('Gunakan AuthContext'); };
+export const changeUserPassword = () => { throw new Error('Gunakan AuthContext'); };
