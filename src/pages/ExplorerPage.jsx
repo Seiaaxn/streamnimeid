@@ -6,16 +6,25 @@ import {
     Flame,
     TrendingUp,
     Star,
-    ChevronLeft
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import GenrePage from './explorer/GenrePage';
 import SchedulePage from './explorer/SchedulePage';
 import PopularPage from './explorer/PopularPage';
 import TrendingPage from './explorer/TrendingPage';
 import TopRatedPage from './explorer/TopRatedPage';
 
-const ExplorerPage = ({ onAnimeSelect }) => {
+const ExplorerPage = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('genre');
+
+    const handleAnimeSelect = (item) => {
+        const category = item.source === 'samehadaku' || item.type === 'Anime' ? 'anime' : 'donghua';
+        let itemUrl = item.url || item.link;
+        if (!itemUrl) return;
+        itemUrl = itemUrl.replace(/\/+$/, '');
+        navigate(`/detail/${category}/${encodeURIComponent(itemUrl)}`);
+    };
 
     const tabs = [
         { id: 'genre', label: 'Genres', icon: Grid3X3, component: GenrePage },
@@ -36,19 +45,18 @@ const ExplorerPage = ({ onAnimeSelect }) => {
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
-
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`
-              flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
-              transition-all duration-200 whitespace-nowrap
-              ${isActive
+                                        flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+                                        transition-all duration-200 whitespace-nowrap
+                                        ${isActive
                                             ? "bg-primary-400 text-black shadow-md"
                                             : "bg-dark-surface text-gray-400 border border-dark-border hover:bg-dark-card hover:text-white"
                                         }
-            `}
+                                    `}
                                 >
                                     <Icon size={16} />
                                     {tab.label}
@@ -59,13 +67,12 @@ const ExplorerPage = ({ onAnimeSelect }) => {
                 </div>
             </header>
 
-
-            {/* Content Area */}
             <main className="min-h-[calc(100vh-120px)]">
-                <ActiveComponent onAnimeSelect={onAnimeSelect} />
+                <ActiveComponent onAnimeSelect={handleAnimeSelect} />
             </main>
         </div>
     );
 };
 
 export default ExplorerPage;
+    
