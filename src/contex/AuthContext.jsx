@@ -1,16 +1,5 @@
 // src/contex/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
-import {
-  registerUser,
-  loginUser,
-  logoutUser,
-  updateUserProfile,
-  uploadAvatar,
-  changeUserPassword
-} from '../firebase/authService';
 
 const AuthContext = createContext(null);
 
@@ -20,62 +9,98 @@ export const useAuth = () => {
   return ctx;
 };
 
+// ── lazy-load firebase agar build tidak gagal jika firebase belum install ─────
+const getFirebase = async () => {
+  try {
+    const [
+      { onAuthStateChanged },
+      { doc, getDoc },
+      { auth, db },
+      authSvc,
+    ] = await Promise.all([
+      import('firebase/auth'),
+      import('firebase/firestore'),
+      import('../firebase/config.js'),
+      import('../firebase/authService.js'),
+    ]);
+    return { onAuthStateChanged, doc, getDoc, auth, db, ...authSvc };
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [firebase, setFirebase] = useState(null);
 
-  const refreshProfile = async (uid) => {
-    try {
-      const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) setProfile(snap.data());
-    } catch (e) {
-      console.error('Error fetching profile:', e);
-    }
-  };
-
+  // ── boot: load firebase, set up auth listener ────────────────────────────
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (fbUser) {
-        await refreshProfile(fbUser.uid);
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
+    let unsub = () => {};
+    getFirebase().then(fb => {
+      setFirebase(fb);
+      if (!fb) { setLoading(false); return; }
+
+      unsub = fb.onAuthStateChanged(fb.auth, async (fbUser) => {
+        setFirebaseUser(fbUser);
+        if (fbUser) {
+          try {
+            const snap = await fb.getDoc(fb.doc(fb.db, 'users', fbUser.uid));
+            if (snap.exists()) setProfile(snap.data());
+          } catch {}
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      });
     });
     return () => unsub();
   }, []);
 
+  const refreshProfile = async () => {
+    if (!firebase || !firebaseUser) return;
+    try {
+      const snap = await firebase.getDoc(firebase.doc(firebase.db, 'users', firebaseUser.uid));
+      if (snap.exists()) setProfile(snap.data());
+    } catch {}
+  };
+
+  // ── auth actions ──────────────────────────────────────────────────────────
   const register = async (username, email, password) => {
-    return await registerUser(username, email, password);
+    if (!firebase) throw new Error('Firebase tidak tersedia');
+    return await firebase.registerUser(username, email, password);
   };
 
   const login = async (email, password) => {
-    return await loginUser(email, password);
+    if (!firebase) throw new Error('Firebase tidak tersedia');
+    return await firebase.loginUser(email, password);
   };
 
   const logout = async () => {
-    await logoutUser();
+    if (!firebase) return;
+    await firebase.logoutUser();
   };
 
   const updateProfile = async (data) => {
-    if (!firebaseUser) throw new Error('Not logged in');
-    await updateUserProfile(firebaseUser.uid, data);
-    await refreshProfile(firebaseUser.uid);
+    if (!firebase || !firebaseUser) throw new Error('Tidak login');
+    await firebase.updateUserProfile(firebaseUser.uid, data);
+    await refreshProfile();
   };
 
   const updateAvatar = async (file) => {
-    if (!firebaseUser) throw new Error('Not logged in');
-    const url = await uploadAvatar(firebaseUser.uid, file);
+    if (!firebase || !firebaseUser) throw new Error('Tidak login');
+    const url = await firebase.uploadAvatar(firebaseUser.uid, file);
     setProfile(prev => ({ ...prev, photoURL: url }));
     return url;
   };
 
   const changePassword = async (currentPassword, newPassword) => {
-    await changeUserPassword(currentPassword, newPassword);
+    if (!firebase) throw new Error('Firebase tidak tersedia');
+    await firebase.changeUserPassword(currentPassword, newPassword);
   };
 
+  // ── merged user object ────────────────────────────────────────────────────
   const user = firebaseUser ? {
     uid: firebaseUser.uid,
     email: firebaseUser.email,
@@ -96,10 +121,10 @@ export const AuthProvider = ({ children }) => {
       updateProfile,
       updateAvatar,
       changePassword,
-      refreshProfile: () => firebaseUser && refreshProfile(firebaseUser.uid),
+      refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
-      
+    
