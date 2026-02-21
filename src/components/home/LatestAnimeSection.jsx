@@ -42,7 +42,7 @@ const LatestAnimeSection = ({ items = [], loading = false, onItemClick }) => {
                     <h2 className="text-sm font-semibold text-white tracking-wide">Latest Anime</h2>
                 </div>
                 <button
-                    onClick={() => navigate('/explore')}
+                    onClick={() => navigate('/explore/all-anime')}
                     className="flex items-center gap-0.5 text-[11px] text-primary-400 hover:text-primary-300 transition-colors"
                 >
                     <span>See All</span>
@@ -110,3 +110,4 @@ const LatestAnimeSection = ({ items = [], loading = false, onItemClick }) => {
 };
 
 export default LatestAnimeSection;
+                                
